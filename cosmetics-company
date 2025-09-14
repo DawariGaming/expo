@@ -1,0 +1,202 @@
+import React, { useState, useEffect } from "react";
+import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, Image } from "react-native";
+import * as ImagePicker from "expo-image-picker";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+// Fake Auth
+const fakeAuth = {
+  login: (email, password) => email && password,
+  register: (email, password) => email && password,
+};
+
+export default function App() {
+  const [user, setUser] = useState(null);
+  const [authMode, setAuthMode] = useState("login");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
+  const [search, setSearch] = useState("");
+  const products = [
+    { id: "1", name: "Lipstick", price: "300 AFN" },
+    { id: "2", name: "Foundation", price: "800 AFN" },
+    { id: "3", name: "Eyeliner", price: "250 AFN" },
+    { id: "4", name: "Perfume", price: "1500 AFN" },
+  ];
+  const filtered = products.filter((item) =>
+    item.name.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [address, setAddress] = useState("");
+  const [orders, setOrders] = useState([]);
+  const [image, setImage] = useState(null);
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  useEffect(() => {
+    saveData();
+  }, [orders, image]);
+
+  const saveData = async () => {
+    try {
+      await AsyncStorage.setItem("orders", JSON.stringify(orders));
+      await AsyncStorage.setItem("image", image || "");
+    } catch (e) {
+      console.log("Error saving data", e);
+    }
+  };
+
+  const loadData = async () => {
+    try {
+      const storedOrders = await AsyncStorage.getItem("orders");
+      const storedImage = await AsyncStorage.getItem("image");
+      if (storedOrders) setOrders(JSON.parse(storedOrders));
+      if (storedImage) setImage(storedImage);
+    } catch (e) {
+      console.log("Error loading data", e);
+    }
+  };
+
+  const handleOrder = () => {
+    if (name && phone && address) {
+      setOrders([...orders, { id: Date.now().toString(), name, phone, address }]);
+      setName("");
+      setPhone("");
+      setAddress("");
+    }
+  };
+
+  const pickImage = async () => {
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 1,
+    });
+
+    if (!result.canceled) {
+      setImage(result.assets[0].uri);
+    }
+  };
+
+  if (!user) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.title}>کاسمیټکس شرکت</Text>
+        <TextInput
+          placeholder="Email"
+          value={email}
+          onChangeText={setEmail}
+          style={styles.input}
+        />
+        <TextInput
+          placeholder="Password"
+          value={password}
+          secureTextEntry
+          onChangeText={setPassword}
+          style={styles.input}
+        />
+        <TouchableOpacity style={styles.button} onPress={() => {
+          if (authMode === "login") {
+            if (fakeAuth.login(email, password)) setUser({ email });
+          } else {
+            if (fakeAuth.register(email, password)) setUser({ email });
+          }
+        }}>
+          <Text style={styles.buttonText}>
+            {authMode === "login" ? "Login" : "Register"}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => setAuthMode(authMode === "login" ? "register" : "login")}
+        >
+          <Text style={{ marginTop: 10, color: "blue" }}>
+            {authMode === "login" ? "Create new account" : "Already have account? Login"}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>کاسمیټکس شرکت</Text>
+
+      <TextInput
+        placeholder="Search products..."
+        value={search}
+        onChangeText={setSearch}
+        style={styles.input}
+      />
+      <FlatList
+        data={filtered}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => (
+          <View style={styles.card}>
+            <Text style={styles.cardText}>{item.name}</Text>
+            <Text>{item.price}</Text>
+          </View>
+        )}
+      />
+
+      <Text style={styles.subtitle}>Place Your Order</Text>
+      <TextInput placeholder="Name" value={name} onChangeText={setName} style={styles.input} />
+      <TextInput placeholder="Phone" value={phone} onChangeText={setPhone} style={styles.input} />
+      <TextInput placeholder="Address" value={address} onChangeText={setAddress} style={styles.input} />
+
+      <TouchableOpacity style={styles.button} onPress={handleOrder}>
+        <Text style={styles.buttonText}>Order Now</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity style={styles.button} onPress={pickImage}>
+        <Text style={styles.buttonText}>📷 عکس پورته کړه</Text>
+      </TouchableOpacity>
+
+      {image && <Image source={{ uri: image }} style={{ width: 200, height: 200, marginTop: 10 }} />}
+
+      <FlatList
+        data={orders}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => (
+          <View style={styles.card}>
+            <Text>{item.name}</Text>
+            <Text>{item.phone}</Text>
+            <Text>{item.address}</Text>
+          </View>
+        )}
+      />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, padding: 20, backgroundColor: "#fff" },
+  title: { fontSize: 22, fontWeight: "bold", textAlign: "center", marginBottom: 20 },
+  subtitle: { fontSize: 18, marginTop: 20, fontWeight: "600" },
+  input: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 10,
+  },
+  button: {
+    backgroundColor: "#ff4081",
+    padding: 12,
+    borderRadius: 8,
+    alignItems: "center",
+    marginTop: 10,
+  },
+  buttonText: { color: "#fff", fontSize: 16, fontWeight: "bold" },
+  card: {
+    backgroundColor: "#f9f9f9",
+    padding: 12,
+    borderRadius: 8,
+    marginVertical: 6,
+    borderWidth: 1,
+    borderColor: "#eee",
+  },
+  cardText: { fontSize: 16, fontWeight: "600" },
+});
